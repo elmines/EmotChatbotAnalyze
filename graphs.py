@@ -17,6 +17,8 @@ def create_parser():
 	parser.add_argument("--max", metavar="N", type=int, default=10, help="Maximum number of categories to have a in a pie graph")
 	parser.add_argument("--percent", metavar="X.XX", type=float, default=0.90, help="Preferred minimum % of pie graph to cover with real categories, not just \"Other\"")
 
+	parser.add_argument("--styles", metavar="<path>.mplstyle", nargs="+", type=str, help="Matplotlib style sheets to customize graph")
+
 	return parser
 
 def pie_graph(responses, max_cat=10, min_percent=0.90):
@@ -65,5 +67,8 @@ if __name__ == "__main__":
 			sys.stderr.write("Must specify both --input and --col.\n")
 			sys.exit(0)
 		lines = pd.read_excel(args.input)[args.col]
+
+	if args.styles is not None:
+		plt.style.use(args.styles)
 
 	pie_graph(lines, max_cat=args.max, min_percent=args.percent)
