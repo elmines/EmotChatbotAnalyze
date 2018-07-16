@@ -18,10 +18,11 @@ def create_parser():
 	parser.add_argument("--percent", metavar="X.XX", type=float, default=0.90, help="Preferred minimum % of pie graph to cover with real categories, not just \"Other\"")
 
 	parser.add_argument("--styles", metavar="<path>.mplstyle", nargs="+", type=str, help="Matplotlib style sheets to customize graph")
+	parser.add_argument("--title", metavar="<Incredible Title>", type=str, help="Title to display")
 
 	return parser
 
-def pie_graph(responses, max_cat=10, min_percent=0.90):
+def pie_graph(responses, max_cat=10, min_percent=0.90, suptitle=None):
 	counts = collections.Counter(responses)
 
 	max_cat = min( max_cat, len(counts.keys()) )	
@@ -42,12 +43,21 @@ def pie_graph(responses, max_cat=10, min_percent=0.90):
 
 		i += 1
 
-	if len(top_responses) == max_cat: categories.append(top_responses[-1])
-	else: categories.append("<Other>")
+	if len(top_responses) == max_cat:
+		categories.append(top_responses[-1])
+		categories = ["\"{}\"".format(category) for category in categories]
+	else:
+		categories = ["\"{}\"".format(category) for category in categories]
+		categories.append("<Other>")
 	percentages.append(1.0 - total_percent)
 
+	#labels = ["{1}\n{0:.2%}".format(percentage, category) for percentage, category in zip(percentages, categories)]
 	fig, axes = plt.subplots()
-	axes.pie(percentages, labels=categories, autopct=lambda pct: "{:.2f}%".format(pct))
+	if suptitle is not None: fig.suptitle(suptitle)
+	axes.pie(percentages, labels=categories,
+		radius=0.75,
+		)
+	axes.set_aspect("equal")
 	plt.show()
 
 
@@ -71,4 +81,4 @@ if __name__ == "__main__":
 	if args.styles is not None:
 		plt.style.use(args.styles)
 
-	pie_graph(lines, max_cat=args.max, min_percent=args.percent)
+	pie_graph(lines, max_cat=args.max, min_percent=args.percent, suptitle=args.title)

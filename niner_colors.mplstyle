@@ -1,1 +1,6 @@
-axes.prop_cycle : cycler("color", ["green", "gold", "white"])
+#Webcolor palette from https://advancement.uncc.edu/university-communications/services/brand-standards/web-standards/web-style-guide
+axes.prop_cycle : cycler("color", ["00703C", "F0CB00", "C3D7A4", "FFF6DC"])
+
+#Not forcing the edgecolor gets a Value error for patch.edgecolor
+patch.force_edgecolor : True 
+patch.edgecolor : black
