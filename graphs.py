@@ -27,22 +27,23 @@ def create_parser():
 	parser.add_argument("--styles", metavar="<path>.mplstyle", nargs="+", type=str, help="Matplotlib style sheets to customize graph")
 
 	parser.add_argument("--multibar", action="store_true", help="Graph percentages from different models on one bar graph")
+	parser.add_argument("--horiz", action="store_true", help="Where applicable, make graph horizontal instead of vertical (i.e. --multibar)")
 
 
 	return parser
 
-def multi_percent_data(responses, max_cat):
+def count_cats(responses, max_cat):
 	"""
 	:param list(list(str))   responses: List of responses for each model
 	:param int           max_cat: Maximum number of categories
 	:param float     min_percent: Preferred minimum % of pie graph to cover with non-<Other> categories"
 
-	:return Tuple of text labels and corresponding percentages
+	:return Tuple of counts and their corresponding text labels
+	:rtype tuple(list(list(int)), list(str)
 	"""
 
 	counters = [collections.Counter(response_set) for response_set in responses]
 	num_cat = min(max_cat, max(len(counter.keys()) for counter in counters))
-	print(num_cat)
 	responses_by_model = [sorted(counter.keys(), key=counter.get, reverse=True) for counter in counters]
 
 	num_models = len(responses)
@@ -50,13 +51,12 @@ def multi_percent_data(responses, max_cat):
 
 	categories = []
 	counts= [ [] for _ in range(num_models) ]
-	while len(categories) < num_cat:
+	while len(categories) < num_cat - 1:
 
 		#Greedily pick the next response with the highest percentage for a single model
 		highest_count = -1
 		next_response = None
 		for i in range(num_models):
-			#print(i)
 			candidate_response = responses_by_model[i][response_indices[i]]
 			count = counters[i][candidate_response]
 			if count > highest_count:
@@ -74,42 +74,67 @@ def multi_percent_data(responses, max_cat):
 			count_set.append(counters[i].get(next_response, 0))
 		categories.append(next_response)
 
+	#FIXME: Actually check for out-of-bounds indices on response_indices (here and elsewhere)
+	if all(response_indices[i] == len(responses_by_model[i]) - 1 for i in range(num_models)):
+		candidate_last = responses_by_model[0][response_indices[0]]
+		if all(responses_by_model[response_indices[i]] == candidate_last for i in range(num_models)):
+			categories.append(candidate_last)
+			for i, count_set in enumerate(counts):
+				count_set.append(counters[i][candidate_last])
+	else:
+		categories.append("<Other>")
+		for i, count_set in enumerate(counts):
+			count_set.append( sum(counters[i][phrase] for phrase in responses_by_model[i][response_indices[i]: ]) )
+		
+
 	return counts, categories
 
 
-def multibar(responses, model_names, max_cat=10, min_percent=0.90, suptitle=None):
+def multibar(responses, model_names, max_cat=10, suptitle=None, horiz=False):
 	"""
-	:param list(list(str)) responses: Responses for each model
-	:param int               max_cat: Maximum number of categories
-	:param float         min_percent: Preferred minimum % of pie graph to cover with non-<Other> categories"
-
+	:param list(list(str))   responses: Responses for each model
+	:param list(str)       model_names: Names for each of the models (used for legends)
+	:param int                 max_cat: Maximum number of categories
+	:param str                suptitle: Title for the plot
+	:param boolean               horiz: Plot a horizontal bar graph rather than a vertical one
 
 	"""	
 
-	assert len(responses) == len(model_names)
+	(counts, categories) = count_cats(responses, max_cat)
 
-	(counts, categories) = multi_percent_data(responses, max_cat)
-
-	width = 0.35
+	width = 0.5
 	bar_width = width / len(model_names)
-
 	indices = np.arange(len(categories))
 
-	#indices + (i * width)
 
 	fig, axes = plt.subplots()
+	coords = [indices - width/2 + i*bar_width for i in range(len(model_names))]
+	if horiz:
+		reverse = lambda seq: [seq[-i-1] for i in range(len(seq))]
+		counts = [reverse(count_set) for count_set in counts]
+		categories  = reverse(categories)
+		coords = reverse(coords) # Just for apppearances, so the bar colors are in the same order as the legend's colors
+		bar_func = axes.barh
+	else:
+		bar_func = axes.bar
+
+
 	for i, model in enumerate(model_names):
+		bar_func(coords[i], counts[i], bar_width, label=model)
 
-
-		axes.bar( (indices - width / 2) + ( (i) * bar_width), counts[i], bar_width, label=model)
-		#axes.bar(indices + (i*bar_width), counts[i], width, label=model)
-
-	axes.set_xticklabels(categories, rotation=45)
-	axes.set_xlabel("Responses")
-	axes.set_ylabel("Frequency")
+	if horiz:
+		axes.set_yticks(indices)
+		axes.set_yticklabels(categories)
+		axes.tick_params("y", length=0)
+		axes.set_xlabel("Frequency")
+		axes.set_ylabel("Responses")
+	else:
+		axes.set_xticks(indices)
+		axes.set_xticklabels(categories, rotation=90)
+		axes.tick_params("x", length=0)
+		axes.set_xlabel("Responses")
+		axes.set_ylabel("Frequency")
 	axes.legend()	
-
-
 
 	plt.show()
 
@@ -120,7 +145,7 @@ def pie_graph(responses, max_cat=10, suptitle=None):
 	:param list(str) responses: Responses for a single model
 	"""
 
-	(counts, categories) = multi_percent_data([responses], max_cat)
+	(counts, categories) = count_cats([responses], max_cat)
 	counts = counts[0]
 
 	#labels = ["{1}\n{0:.2%}".format(percentage, category) for percentage, category in zip(percentages, categories)]
@@ -159,6 +184,6 @@ if __name__ == "__main__":
 		plt.style.use(args.styles)
 
 	if args.multibar:
-		multibar(lines, args.model_names, max_cat=args.max, suptitle=args.title)
+		multibar(lines, args.model_names, max_cat=args.max, suptitle=args.title, horiz=args.horiz)
 	else:
 		pie_graph(lines[0], max_cat=args.max, suptitle=args.title)
