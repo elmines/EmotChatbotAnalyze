@@ -1,0 +1,4 @@
+figure.autolayout : True
+axes.labelweight : bold
+legend.framealpha : 0.0
+figure.figsize : 18.0 , 6.0
