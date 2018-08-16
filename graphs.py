@@ -142,6 +142,7 @@ def multibar(responses, model_names, max_cat=10, suptitle=None, horiz=False):
 
 
 	fig, axes = plt.subplots()
+	if suptitle is not None: fig.suptitle(suptitle)
 	coords = [indices - width/2 + i*bar_width for i in range(len(model_names))]
 	if horiz:
 		reverse = lambda seq: [seq[-i-1] for i in range(len(seq))]
