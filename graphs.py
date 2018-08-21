@@ -24,6 +24,9 @@ def create_parser():
 	parser.add_argument("--input", "-i", metavar="responses.xlsx", nargs="+", help="Spreadsheet(s) containing the responses as one of the columns.")
 	parser.add_argument("--col", "-c", metavar="column_name", nargs="+",  help="Column name from which to obtain responses. Pass in one name to use the same name for all --input's")
 
+	parser.add_argument("--cats", metavar="\"How are you?\"", nargs="+", help="Prespecified responses to use as categories")
+	parser.add_argument("--indices", metavar="n", type=int, nargs="+", help="Used with --cat, specifies the exclusive array indices by which to group responses in --cat")
+
 
 	parser.add_argument("--title", metavar="<Title>", type=str, help="Title to display for the entire plot")
 	parser.add_argument("--model-names", metavar="<Subtitle>", nargs="+", help="Titles for each subplot when providing multiple --input's")
@@ -123,7 +126,33 @@ def count_cats(responses, max_cat):
 	return counts, categories
 
 
-def multibar(responses, model_names, max_cat=10, suptitle=None, horiz=False):
+def _count_predefs(responses, predef):
+	"""
+	:param list(list(str))   responses: Responses for each model where responses[i][j] is the jth response of the ith model
+	:param list(list(str))      predef: Predefined category \"groups, \" such as [[\"Yes\", \"Yeah\", \"Of course\"], [\"No\", \"Heck, no\", \"Never\"]]
+
+	:returns: Tuple of counts and their corresponding text labels
+	:rtype:  tuple(list(list(int)), list(str))
+	"""
+	model_counts = []
+	for model_i_responses in responses:
+		model_i_counts = [0 for _ in range(len(predef))]
+		for response in model_i_responses:
+			for (j, group) in enumerate(predef):
+				if response in group: model_i_counts[j] += 1
+		other_count = len(model_i_responses) - sum(model_i_counts)
+		model_i_counts.append(other_count)
+		model_counts.append(model_i_counts)
+
+
+	quoted_predef = [[quote(response) for response in group] for group in predef]
+
+	labels = ["/\n".join(group) for group in quoted_predef] + ["<Other>"]
+
+	return (model_counts, labels)
+					
+
+def multibar(responses, model_names, max_cat=10, suptitle=None, horiz=False, predef=None):
 	"""
 	Graphs the frequencies of different models' responses
 
@@ -132,9 +161,14 @@ def multibar(responses, model_names, max_cat=10, suptitle=None, horiz=False):
 	:param int                 max_cat: Maximum number of categories
 	:param str                suptitle: Title for the plot
 	:param boolean               horiz: Plot a horizontal bar graph rather than a vertical one
+	:param list(list(str))      predef: Predefined category \"groups, \" such as [[\"Yes\", \"Yeah\", \"Of course\"], [\"No\", \"Heck, no\", \"Never\"]]
 	"""	
 
-	(counts, categories) = count_cats(responses, max_cat)
+	if predef is None:
+		(counts, categories) = count_cats(responses, max_cat)
+	else:
+		(counts, categories) = _count_predefs(responses, predef)
+
 
 	width = 0.5
 	bar_width = width / len(model_names)
@@ -214,11 +248,23 @@ if __name__ == "__main__":
 			args.col *= len(args.input)
 		lines = [ list(pd.read_excel(path)[args.col[i]]) for i, path in enumerate(args.input)]
 
+	predef = None
+	if args.cats:
+		predef = args.cats
+		if args.indices:
+			predef = []
+			prev_index = 0
+			for index in args.indices:
+				if index == prev_index: continue
+				predef.append( args.cats[prev_index:index] )
+				prev_index = index
+			if prev_index < len(args.cats): predef.append(args.cats[prev_index:])
+
 
 	if args.styles is not None:
 		plt.style.use(args.styles)
 
 	if args.multibar:
-		multibar(lines, args.model_names, max_cat=args.max, suptitle=args.title, horiz=args.horiz)
+		multibar(lines, args.model_names, max_cat=args.max, suptitle=args.title, horiz=args.horiz, predef=predef)
 	else:
 		pie_graph(lines[0], max_cat=args.max, suptitle=args.title)
